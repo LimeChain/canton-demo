@@ -1,7 +1,7 @@
 services:
   canton-synchronizer:
     build:
-      context: ./docker/canton
+      context: ./docker
       args:
         CANTON_VERSION: "3.5.1"
     image: canton-demo-canton:3.5.1
@@ -11,8 +11,8 @@ services:
       CANTON_BOOTSTRAP: /bootstrap/bootstrap-synchronizer.canton
       JAVA_OPTS: "-Xms256m -Xmx1g"
     volumes:
-      - ./canton/synchronizer.conf:/config/synchronizer.conf:ro
-      - ./canton/bootstrap-synchronizer.canton:/bootstrap/bootstrap-synchronizer.canton:ro
+      - ./config/synchronizer.conf:/config/synchronizer.conf:ro
+      - ./config/bootstrap-synchronizer.canton:/bootstrap/bootstrap-synchronizer.canton:ro
     ports:
       - "5001:5001"
       - "5002:5002"
@@ -25,9 +25,28 @@ services:
     networks:
       - canton-demo
 
+  pqs-postgres:
+    image: postgres:16-alpine
+    container_name: canton-demo-pqs-postgres
+    environment:
+      POSTGRES_USER: canton
+      POSTGRES_PASSWORD: canton
+      POSTGRES_DB: postgres
+    volumes:
+      - ./config/postgres/init-pqs.sql:/docker-entrypoint-initdb.d/init-pqs.sql:ro
+    ports:
+      - "65432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U canton -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - canton-demo
+
   participant-bank:
     build:
-      context: ./docker/canton
+      context: ./docker
       args:
         CANTON_VERSION: "3.5.1"
     image: canton-demo-canton:3.5.1
@@ -42,8 +61,8 @@ services:
       SYNCHRONIZER_URL: http://canton-synchronizer:5001
       JAVA_OPTS: "-Xms256m -Xmx1g"
     volumes:
-      - ./canton/participant-bank.conf:/config/participant-bank.conf:ro
-      - ./canton/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+      - ./config/participant-bank.conf:/config/participant-bank.conf:ro
+      - ./config/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
     ports:
       - "5011:5011"
       - "5012:5012"
@@ -56,9 +75,54 @@ services:
     networks:
       - canton-demo
 
+  pqs-bank:
+    image: europe-docker.pkg.dev/da-images/public/docker/participant-query-store:3.5.1
+    container_name: canton-demo-pqs-bank
+    depends_on:
+      participant-bank:
+        condition: service_healthy
+      pqs-postgres:
+        condition: service_healthy
+    command:
+      - pipeline
+      - ledger
+      - postgres-document
+      - --pipeline-ledger-start
+      - Latest
+      - --pipeline-filter-parties
+      - "*"
+      - --source-ledger-host
+      - participant-bank
+      - --source-ledger-port
+      - "5011"
+      - --source-ledger-auth
+      - NoAuth
+      - --target-postgres-host
+      - pqs-postgres
+      - --target-postgres-port
+      - "5432"
+      - --target-postgres-database
+      - pqs_bank
+      - --target-postgres-username
+      - canton
+      - --target-postgres-password
+      - canton
+      - --target-schema-autoapply
+      - "true"
+      - --health-address
+      - 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: on-failure
+    networks:
+      - canton-demo
+
   participant-users:
     build:
-      context: ./docker/canton
+      context: ./docker
       args:
         CANTON_VERSION: "3.5.1"
     image: canton-demo-canton:3.5.1
@@ -73,8 +137,8 @@ services:
       SYNCHRONIZER_URL: http://canton-synchronizer:5001
       JAVA_OPTS: "-Xms256m -Xmx1g"
     volumes:
-      - ./canton/participant-users.conf:/config/participant-users.conf:ro
-      - ./canton/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+      - ./config/participant-users.conf:/config/participant-users.conf:ro
+      - ./config/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
     ports:
       - "5021:5011"
       - "5022:5012"
@@ -87,9 +151,54 @@ services:
     networks:
       - canton-demo
 
+  pqs-users:
+    image: europe-docker.pkg.dev/da-images/public/docker/participant-query-store:3.5.1
+    container_name: canton-demo-pqs-users
+    depends_on:
+      participant-users:
+        condition: service_healthy
+      pqs-postgres:
+        condition: service_healthy
+    command:
+      - pipeline
+      - ledger
+      - postgres-document
+      - --pipeline-ledger-start
+      - Latest
+      - --pipeline-filter-parties
+      - "*"
+      - --source-ledger-host
+      - participant-users
+      - --source-ledger-port
+      - "5011"
+      - --source-ledger-auth
+      - NoAuth
+      - --target-postgres-host
+      - pqs-postgres
+      - --target-postgres-port
+      - "5432"
+      - --target-postgres-database
+      - pqs_users
+      - --target-postgres-username
+      - canton
+      - --target-postgres-password
+      - canton
+      - --target-schema-autoapply
+      - "true"
+      - --health-address
+      - 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: on-failure
+    networks:
+      - canton-demo
+
   participant-observer:
     build:
-      context: ./docker/canton
+      context: ./docker
       args:
         CANTON_VERSION: "3.5.1"
     image: canton-demo-canton:3.5.1
@@ -104,13 +213,58 @@ services:
       SYNCHRONIZER_URL: http://canton-synchronizer:5001
       JAVA_OPTS: "-Xms256m -Xmx1g"
     volumes:
-      - ./canton/participant-observer.conf:/config/participant-observer.conf:ro
-      - ./canton/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+      - ./config/participant-observer.conf:/config/participant-observer.conf:ro
+      - ./config/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
     ports:
       - "5031:5011"
       - "5032:5012"
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: on-failure
+    networks:
+      - canton-demo
+
+  pqs-observer:
+    image: europe-docker.pkg.dev/da-images/public/docker/participant-query-store:3.5.1
+    container_name: canton-demo-pqs-observer
+    depends_on:
+      participant-observer:
+        condition: service_healthy
+      pqs-postgres:
+        condition: service_healthy
+    command:
+      - pipeline
+      - ledger
+      - postgres-document
+      - --pipeline-ledger-start
+      - Latest
+      - --pipeline-filter-parties
+      - "*"
+      - --source-ledger-host
+      - participant-observer
+      - --source-ledger-port
+      - "5011"
+      - --source-ledger-auth
+      - NoAuth
+      - --target-postgres-host
+      - pqs-postgres
+      - --target-postgres-port
+      - "5432"
+      - --target-postgres-database
+      - pqs_observer
+      - --target-postgres-username
+      - canton
+      - --target-postgres-password
+      - canton
+      - --target-schema-autoapply
+      - "true"
+      - --health-address
+      - 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080'"]
       interval: 5s
       timeout: 3s
       retries: 30

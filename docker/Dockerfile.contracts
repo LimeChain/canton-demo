@@ -1,0 +1,17 @@
+FROM eclipse-temurin:17-jdk
+
+ENV DPM_HOME=/opt/dpm
+ENV PATH="${DPM_HOME}/bin:${PATH}"
+ENV TERM=dumb
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends bash ca-certificates curl \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://get.digitalasset.com/install/install.sh | sh \
+  && dpm install 3.5.1 \
+  && chmod -R a+rX "${DPM_HOME}"
+
+WORKDIR /workspace/contracts
+
+CMD ["sh", "-lc", "cd daml && dpm build && cd ../daml-test && dpm test"]

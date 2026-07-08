@@ -1,0 +1,3 @@
+CREATE DATABASE pqs_bank;
+CREATE DATABASE pqs_users;
+CREATE DATABASE pqs_observer;
