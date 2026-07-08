@@ -1,0 +1,123 @@
+services:
+  canton-synchronizer:
+    build:
+      context: ./docker/canton
+      args:
+        CANTON_VERSION: "3.5.1"
+    image: canton-demo-canton:3.5.1
+    container_name: canton-demo-synchronizer
+    environment:
+      CANTON_CONFIG: /config/synchronizer.conf
+      CANTON_BOOTSTRAP: /bootstrap/bootstrap-synchronizer.canton
+      JAVA_OPTS: "-Xms256m -Xmx1g"
+    volumes:
+      - ./canton/synchronizer.conf:/config/synchronizer.conf:ro
+      - ./canton/bootstrap-synchronizer.canton:/bootstrap/bootstrap-synchronizer.canton:ro
+    ports:
+      - "5001:5001"
+      - "5002:5002"
+      - "5202:5202"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5001'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - canton-demo
+
+  participant-bank:
+    build:
+      context: ./docker/canton
+      args:
+        CANTON_VERSION: "3.5.1"
+    image: canton-demo-canton:3.5.1
+    container_name: canton-demo-participant-bank
+    depends_on:
+      canton-synchronizer:
+        condition: service_healthy
+    environment:
+      CANTON_CONFIG: /config/participant-bank.conf
+      CANTON_BOOTSTRAP: /bootstrap/bootstrap-participant.canton
+      SYNCHRONIZER_ALIAS: demo
+      SYNCHRONIZER_URL: http://canton-synchronizer:5001
+      JAVA_OPTS: "-Xms256m -Xmx1g"
+    volumes:
+      - ./canton/participant-bank.conf:/config/participant-bank.conf:ro
+      - ./canton/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+    ports:
+      - "5011:5011"
+      - "5012:5012"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: on-failure
+    networks:
+      - canton-demo
+
+  participant-users:
+    build:
+      context: ./docker/canton
+      args:
+        CANTON_VERSION: "3.5.1"
+    image: canton-demo-canton:3.5.1
+    container_name: canton-demo-participant-users
+    depends_on:
+      canton-synchronizer:
+        condition: service_healthy
+    environment:
+      CANTON_CONFIG: /config/participant-users.conf
+      CANTON_BOOTSTRAP: /bootstrap/bootstrap-participant.canton
+      SYNCHRONIZER_ALIAS: demo
+      SYNCHRONIZER_URL: http://canton-synchronizer:5001
+      JAVA_OPTS: "-Xms256m -Xmx1g"
+    volumes:
+      - ./canton/participant-users.conf:/config/participant-users.conf:ro
+      - ./canton/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+    ports:
+      - "5021:5011"
+      - "5022:5012"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: on-failure
+    networks:
+      - canton-demo
+
+  participant-observer:
+    build:
+      context: ./docker/canton
+      args:
+        CANTON_VERSION: "3.5.1"
+    image: canton-demo-canton:3.5.1
+    container_name: canton-demo-participant-observer
+    depends_on:
+      canton-synchronizer:
+        condition: service_healthy
+    environment:
+      CANTON_CONFIG: /config/participant-observer.conf
+      CANTON_BOOTSTRAP: /bootstrap/bootstrap-participant.canton
+      SYNCHRONIZER_ALIAS: demo
+      SYNCHRONIZER_URL: http://canton-synchronizer:5001
+      JAVA_OPTS: "-Xms256m -Xmx1g"
+    volumes:
+      - ./canton/participant-observer.conf:/config/participant-observer.conf:ro
+      - ./canton/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+    ports:
+      - "5031:5011"
+      - "5032:5012"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: on-failure
+    networks:
+      - canton-demo
+
+networks:
+  canton-demo:
+    driver: bridge

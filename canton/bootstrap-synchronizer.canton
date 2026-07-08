@@ -1,0 +1,12 @@
+nodes.local.start()
+
+bootstrap.synchronizer(
+  synchronizerName = "demo",
+  sequencers = Seq(sequencer1),
+  mediators = Seq(mediator1),
+  synchronizerOwners = Seq(sequencer1, mediator1),
+  synchronizerThreshold = 2,
+  staticSynchronizerParameters = StaticSynchronizerParameters.defaultsWithoutKMS(ProtocolVersion.forSynchronizer),
+)
+
+println("Canton demo synchronizer bootstrapped.")

@@ -1,0 +1,17 @@
+nodes.local.start()
+
+val participant = participants.all.head
+val synchronizerAlias = sys.env.getOrElse("SYNCHRONIZER_ALIAS", "demo")
+val synchronizerUrl = sys.env.getOrElse("SYNCHRONIZER_URL", "http://canton-synchronizer:5001")
+
+utils.retry_until_true {
+  try {
+    participant.synchronizers.connect(synchronizerAlias, synchronizerUrl)
+  } catch {
+    case _: Throwable => ()
+  }
+
+  participant.synchronizers.active(synchronizerAlias)
+}
+
+println(s"${participant.name} connected to synchronizer '$synchronizerAlias'.")
