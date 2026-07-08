@@ -1,0 +1,97 @@
+module DemoMoneyTest where
+
+-- Daml Script gives the test env a local ledger-style API
+-- allocate parties, submit commands, query visible contracts, and assert expected failures.
+import Daml.Script
+
+-- The test package imports the deployable contract package from the built DAR.
+import DemoMoney
+
+-- Here we can demonstrate the essential Daml Script flow
+-- party allocation, bank-created state, expected authorization failures,
+-- a customer transfer request, bank execution, and party-specific visibility.
+testBankAccountTransfer : Script ()
+testBankAccountTransfer = script do
+  -- Parties are practically ledger identities used by commands and visibility checks
+  bank <- allocateParty "Bank"
+  alice <- allocateParty "Alice"
+  bob <- allocateParty "Bob"
+  petyo <- allocateParty "Petyo"
+  gosho <- allocateParty "Gosho"
+
+  -- Setup is submitted by Bank because BankAccount is the signatory.
+  -- Alice starts with 50 and Petyo is added as observer/viewer.
+  submit bank do
+    createCmd BankAccount with
+      bank
+      owner = alice
+      balance = 50.0
+      viewers = [petyo]
+
+  -- Same for Bob
+  submit bank do
+    createCmd BankAccount with
+      bank
+      owner = bob
+      balance = 50.0
+      viewers = [petyo]
+
+  -- A negative assertion will be for Alice who cannot create a BankAccount herself,
+  -- because she is not authorized to act as the Bank signatory.
+  submitMustFail alice do
+    createCmd BankAccount with
+      bank
+      owner = alice
+      balance = 1000.0
+      viewers = []
+
+  -- Petyo is an observer, so he can query Alice and Bob accounts.
+  -- This proves his involvement is visibility-only and not in real control
+  petyoInitialAccounts <- query @BankAccount petyo
+  assertMsg "Petyo should initially see Alice and Bob accounts" (length petyoInitialAccounts == 2)
+
+  -- Picking up Alices account from Petyo own visible contracts
+  -- This will make the next negative example explicit - Petyo can see the account,
+  -- but visibility does not give him any authority to move balance
+  let [(aliceCidVisibleToPetyo, _)] = filter (\(_, account) -> account.owner == alice) petyoInitialAccounts
+
+  -- So the negative test where Petyo can observe Alice's account, but he is not the controller
+  -- of RequestTransfer, so he cannot move balance on Alice behalf.
+  submitMustFail petyo do
+    exerciseCmd aliceCidVisibleToPetyo RequestTransfer with
+      receiver = bob
+      transferAmount = 1.0
+
+  -- Now Alice signs the transfer intent from her own account
+  -- This creates a TransferInstruction but it does not update balances yet.
+  [(aliceCid, _)] <- query @BankAccount alice
+  transferInstructionCid <- submit alice do
+    exerciseCmd aliceCid RequestTransfer with
+      receiver = bob
+      transferAmount = 10.0
+
+  -- Bank must execute the instruction and posts the debit/credit.
+  -- This is where Alice goes from 50 to 40 and Bob from 50 to 60
+  submit bank do
+    exerciseCmd transferInstructionCid Execute
+
+  -- Query the ledger from each party perspective
+  -- Visibility is party-specific where observer parties see contracts and unrelated parties do not
+  aliceAccounts <- query @BankAccount alice
+  bobAccounts <- query @BankAccount bob
+  petyoAccounts <- query @BankAccount petyo
+  goshoAccounts <- query @BankAccount gosho
+
+  -- Let's add a minimal visibility assertions for the demo assumptions
+  assertMsg "Alice should see one account" (length aliceAccounts == 1)
+  assertMsg "Bob should see one account" (length bobAccounts == 1)
+  assertMsg "Petyo should see Alice and Bob accounts" (length petyoAccounts == 2)
+  assertMsg "Gosho should see nothing" (length goshoAccounts == 0)
+
+  -- Extract the final account payloads from the query results.
+  let [(_, aliceAccount)] = aliceAccounts
+  let [(_, bobAccount)] = bobAccounts
+
+  -- Final balance assertions proving the transfer was posted correctly
+  assertMsg "Alice should have 40 after transfer" (aliceAccount.balance == 40.0)
+  assertMsg "Bob should have 60 after transfer" (bobAccount.balance == 60.0)

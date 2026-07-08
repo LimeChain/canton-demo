@@ -1,0 +1,146 @@
+module DemoMoney where
+
+-- Imports the Daml 3.5+ helper functions for key-based contract lookup.
+-- We use this so demo users can transfer by party name instead of passing ContractIds.
+import DA.ContractKeys
+
+-- Stable business key for a bank account.
+-- The first Party is the bank operating the account
+-- The second Party would be the account owner.
+type AccountKey = (Party, Party)
+
+-- BankAccount represents one customer balance at one bank
+-- For the intended demo, Alice and Bob will start with one BankAccount contract at the same bank.
+template BankAccount
+  with
+    -- The bank is the institution maintaining customer balances on its ledger. 
+    -- It must authorize creation/replacement of BankAccount contracts
+    -- Otherwise the customer authorizes the transfer requests themselves (the RequestTransfer choice)
+    -- Then the bank authorizes the execution of those transfers (TransferInstruction -> Execute choice).
+    bank : Party
+    -- The owner is the customer itself, whose balance this account represents
+    -- Naturally only the owner can request movement from the account
+    owner : Party
+    -- The current account balance for the very owner
+    -- Decimal is the prefered Daml fixed-point (10 digits after the decimal point)
+    -- It avoids the common binary floating-point rounding issues and also keeps 
+    -- the Ledger API/PQS representations as decimal-strings
+    balance : Decimal
+    -- These are the parties who can see this contract but cannot control it
+    -- For demonstration purposes Petyo is added here so he can observe Alice and Bob balances.
+    -- We can relate Petyo to a 3rd party regulatory instituion in need of observing people transfers
+    viewers : [Party]
+  where
+    -- The signatory, a.k.a the bank, must authorize creation of every BankAccount contract
+    -- This prevents Alice, Bob, Petyo, or Gosho from "printing" money by creating balances themselves.
+    signatory bank
+    -- The owner can see their own balance.
+    -- Every party listed in viewers can also see it.
+    -- Imaginary Gosho is not listed, for demo purposes, so he cannot see Alice or Bob balances, unlike Petyo.
+    observer owner, viewers
+
+    -- Contract key used for stable lookup.
+    -- Instead of exposing ContractIds to users, app/scripts code can find an account by (bank, owner).
+    key (bank, owner) : AccountKey
+    -- The key maintainer is the bank, so the bank owns the account namespace and authorizes key lookups.
+    maintainer key._1
+
+    -- Sample invariant demonstration upon creation/recplacement: an account cannot represent a negative balance.
+    ensure balance >= 0.0
+
+    -- RequestTransfer creates a payment instruction from this account owner to the bank.
+    -- The owner can request the transfer, but it is the bank to execute it because the bank can see both accounts.
+    nonconsuming choice RequestTransfer : ContractId TransferInstruction
+      with
+        -- The customer receiving the amount.
+        -- The receiver must already have a BankAccount at the same bank.
+        receiver : Party
+        -- The amount the owner wants to send to the receiver.
+        transferAmount : Decimal
+      -- Controller defines the current owner so he is the only one 
+      -- that can request a transfer from their own account.
+      controller owner
+      do
+        -- Some basic assertions
+        -- Reject zero or negative transfers.
+        assertMsg "transfer amount must be positive" (transferAmount > 0.0)
+        -- Reject obviously underfunded transfer requests before the bank executes them.
+        -- The bank checks again during execution because account state may change between request and execution.
+        assertMsg "insufficient funds" (transferAmount <= balance)
+
+        -- Create a transfer instruction visible to the bank.
+        -- The bank later executes it and posts the debit/credit against involved accounts.
+        create TransferInstruction with
+          bank
+          sender = owner
+          receiver
+          transferAmount
+          viewers
+
+template TransferInstruction
+  with
+    -- The bank that will execute the transfer instruction.
+    bank : Party
+    -- The customer requesting the transfer.
+    sender : Party
+    -- The customer receiving the transfer.
+    receiver : Party
+    -- The amount the sender wants to transfer.
+    transferAmount : Decimal
+    -- Extra parties who can view the instruction.
+    -- In this demo, again, is Petyo
+    viewers : [Party]
+  where
+    -- The sender signs the instruction, proving that the customer itself requested the transfer.
+    signatory sender
+    -- The bank can see the instruction and execute it.
+    -- Viewers can see the instruction but cannot execute it.
+    observer bank, viewers
+
+    -- Transfer instructions must always be for positive amounts.
+    ensure transferAmount > 0.0
+
+    -- Execute posts the requested transfer on the bank's account ledger.
+    -- Only the bank can execute, because only the bank can see and update both customer accounts.
+    choice Execute : ()
+      controller bank
+      do
+        -- Find the sender's current account by stable key.
+        -- We query for up to 2 matches so we also can detect ongoing incosistency,
+        -- an invalid duplicate-account state.
+        senderMatches <- lookupNByKey @BankAccount 2 (bank, sender)
+        -- But we accept exactly one sender account anyway.
+        -- No account means the sender is not onboarded at this bank.
+        -- More than one means our one-account-per-owner-per-bank invariant is broken.
+        (senderCid, senderAccount) <- case senderMatches of
+          [(cid, account)] -> pure (cid, account)
+          [] -> fail "sender has no BankAccount at this bank"
+          _ -> fail "sender has more than one BankAccount at this bank"
+
+        -- Find the receiver's current account by stable key.
+        receiverMatches <- lookupNByKey @BankAccount 2 (bank, receiver)
+        (receiverCid, receiverAccount) <- case receiverMatches of
+          [(cid, account)] -> pure (cid, account)
+          [] -> fail "receiver has no BankAccount at this bank"
+          _ -> fail "receiver has more than one BankAccount at this bank"
+
+        -- Let's recheck sufficient funds at execution time
+        -- This protects the bank if the sender's balance changed after the instruction was created.
+        assertMsg "insufficient funds" (transferAmount <= senderAccount.balance)
+
+        -- Execute is a consuming choice by default so the transfer instruction is consumed automatically
+        -- Consume the sender's old account record.
+        -- Since Daml contracts are immutable updating a balance means we archive the old + create new
+        archive senderCid
+        archive receiverCid
+
+        -- Recreate the involved party accounts after subtracting the transfer amount.
+        -- any other fields are preserved from the old accounts.
+        create senderAccount with
+          balance = senderAccount.balance - transferAmount
+        create receiverAccount with
+          balance = receiverAccount.balance + transferAmount
+
+        -- The choice intentionally returns no ContractIds since the demo interaction 
+        -- is command/query driven, not raw-CID used
+        pure ()

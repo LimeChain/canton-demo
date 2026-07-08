@@ -1,0 +1,13 @@
+sdk-version: 3.5.1
+name: canton-demo-money-tests
+source: .
+version: 0.1.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../daml/.daml/dist/canton-demo-money-0.1.0.dar
+build-options:
+  - --target=2.dev
+
