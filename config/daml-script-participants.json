@@ -1,0 +1,21 @@
+{
+  "default_participant": {
+    "host": "participant-bank",
+    "port": 5011
+  },
+  "participants": {
+    "bank": {
+      "host": "participant-bank",
+      "port": 5011
+    },
+    "users": {
+      "host": "participant-users",
+      "port": 5011
+    },
+    "observer": {
+      "host": "participant-observer",
+      "port": 5011
+    }
+  },
+  "party_participants": {}
+}

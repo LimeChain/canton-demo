@@ -1,0 +1,91 @@
+module DemoMoneyDeploy where
+
+import Daml.Script
+import DemoMoney
+import DA.Text qualified as Text
+
+-- This module is just for deploy automation, a Daml Script.
+-- It defines no contract templates.
+-- The real contract template is in contracts/daml/DemoMoney.daml
+
+-- Allocated party IDs are real Canton identifiers.
+-- We persist them to .demo/parties.json so later commands can reuse them.
+data DemoParties = DemoParties
+  with
+    -- Hosted on participant-bank.
+    bank : Party
+    -- Hosted on participant-users.
+    alice : Party
+    -- Hosted on participant-users.
+    bob : Party
+    -- Hosted on participant-observer.
+    petyo : Party
+    -- Hosted on participant-users. Gosho is intentionally not added as viewer.
+    gosho : Party
+  deriving (Eq, Show)
+
+-- First-run setup.
+-- Finds or allocates each demo party on the intended participant, then creates the
+-- initial Alice/Bob bank accounts.
+allocateAndSetup : Script DemoParties
+allocateAndSetup = script do
+  -- Each helper call first looks for an already allocated party whose Canton ID
+  -- starts with the given hint, for example Bank::...
+  -- If no such party exists on the target participant, it allocates one there.
+  -- ParticipantName values refer to aliases in config/daml-script-participants.json.
+  bank <- getOrAllocatePartyByHintOn "Bank" (ParticipantName "bank")
+  alice <- getOrAllocatePartyByHintOn "Alice" (ParticipantName "users")
+  bob <- getOrAllocatePartyByHintOn "Bob" (ParticipantName "users")
+  gosho <- getOrAllocatePartyByHintOn "Gosho" (ParticipantName "users")
+  petyo <- getOrAllocatePartyByHintOn "Petyo" (ParticipantName "observer")
+
+  let parties = DemoParties with bank; alice; bob; petyo; gosho
+  setupInitialState parties
+  pure parties
+
+-- Creates missing initial accounts for already known parties.
+setupInitialState : DemoParties -> Script ()
+setupInitialState parties = script do
+  -- Bank is the signatory of BankAccount, so Bank can see all BankAccount
+  -- contracts it has issued and can check whether initial accounts already exist.
+  accounts <- query @BankAccount parties.bank
+
+  createInitialAccountIfMissing parties accounts parties.alice
+  createInitialAccountIfMissing parties accounts parties.bob
+
+createInitialAccountIfMissing
+  : DemoParties
+  -> [(ContractId BankAccount, BankAccount)]
+  -> Party
+  -> Script ()
+createInitialAccountIfMissing parties accounts owner =
+  if hasAccountFor owner accounts
+    then pure ()
+    else do
+      _ <- submit parties.bank do
+        createCmd BankAccount with
+          bank = parties.bank
+          owner
+          balance = 50.0
+          viewers = [parties.petyo]
+      pure ()
+
+-- Small helper to make setupInitialState idempotent for reruns
+hasAccountFor : Party -> [(ContractId BankAccount, BankAccount)] -> Bool
+hasAccountFor owner accounts =
+  any (\(_, account) -> account.owner == owner) accounts
+
+-- Recover an already allocated party by its human-readable hint.
+-- This handles interrupted deploy runs where party allocation succeeded but
+-- .demo/parties.json was not written because a later step failed.
+getOrAllocatePartyByHintOn : Text -> ParticipantName -> Script Party
+getOrAllocatePartyByHintOn hint participant = script do
+  knownParties <- listKnownPartiesOn participant
+  case filter (partyMatchesHint hint) knownParties of
+    [partyDetails] -> pure partyDetails.party
+    [] -> allocatePartyByHintOn (PartyIdHint hint) participant
+    _ -> fail ("multiple parties found for hint " <> hint)
+
+partyMatchesHint : Text -> PartyDetails -> Bool
+partyMatchesHint hint partyDetails =
+  Text.isPrefixOf (hint <> "::") (partyToText partyDetails.party)

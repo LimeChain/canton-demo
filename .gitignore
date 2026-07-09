@@ -2,6 +2,7 @@
 .env
 .env.local
 .contracts-image
+.demo/
 .daml/
 .data/
 dist/

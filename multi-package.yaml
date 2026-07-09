@@ -1,0 +1,6 @@
+sdk-version: 3.5.1
+
+packages:
+  - ./contracts/daml
+  - ./contracts/daml-test
+  - ./scripts/daml

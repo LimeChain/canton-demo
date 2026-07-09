@@ -1,5 +1,5 @@
 sdk-version: 3.5.1
-name: canton-demo-money-tests
+name: canton-demo-money-scripts
 source: .
 version: 0.1.0
 dependencies:
@@ -7,6 +7,6 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies:
-  - ../daml/.daml/dist/canton-demo-money-0.1.0.dar
+  - ../../contracts/daml/.daml/dist/canton-demo-money-0.1.0.dar
 build-options:
   - --target=2.3
