@@ -9,6 +9,59 @@ import DA.ContractKeys
 -- The second Party would be the account owner.
 type AccountKey = (Party, Party)
 
+-- Explicit direction for bank-posted balance adjustments.
+data BalanceAdjustmentType = Credit | Debit
+  deriving (Eq, Show)
+
+-- BankAccountDirectory is the bank-published list of parties that can receive transfers.
+-- It deliberately contains identities only, not balances, so account holders can validate
+-- recipients without gaining visibility into each other's BankAccount contracts.
+template BankAccountDirectory
+  with
+    -- The bank controls which customers are onboarded for transfers.
+    bank : Party
+    -- Parties allowed to receive transfers at this bank.
+    accountHolders : [Party]
+  where
+    -- Only the bank can create or replace the directory.
+    signatory bank
+    -- Account holders can see the directory, so they can check valid recipients.
+    observer accountHolders
+
+    -- One active directory per bank.
+    key bank : Party
+    maintainer key
+
+    -- Issue a new account and add the owner to the bank's transfer directory in one ledger command.
+    -- Only the bank can do this because the bank controls onboarding and account issuance.
+    choice IssueAccount : ContractId BankAccount
+      with
+        -- The party that will own the newly issued account.
+        owner : Party
+        -- Initial balance assigned by the bank.
+        initialBalance : Decimal
+        -- Extra observer parties for the new account.
+        viewers : [Party]
+      controller bank
+      do
+        assertMsg "initial balance cannot be negative" (initialBalance >= 0.0)
+        assertMsg "account holder already exists in directory" (not (containsParty owner accountHolders))
+
+        existingAccounts <- lookupNByKey @BankAccount 2 (bank, owner)
+        case existingAccounts of
+          [] -> pure ()
+          [_] -> fail "owner already has a BankAccount at this bank"
+          _ -> fail "owner has more than one BankAccount at this bank"
+
+        _ <- create this with
+          accountHolders = accountHolders ++ [owner]
+
+        create BankAccount with
+          bank
+          owner
+          balance = initialBalance
+          viewers
+
 -- BankAccount represents one customer balance at one bank
 -- For the intended demo, Alice and Bob will start with one BankAccount contract at the same bank.
 template BankAccount
@@ -21,7 +74,8 @@ template BankAccount
     -- The owner is the customer itself, whose balance this account represents
     -- Naturally only the owner can request movement from the account
     owner : Party
-    -- The current account balance for the very owner
+    -- The current account balance for the very owner.
+    -- It may become negative if the bank posts a debit larger than the current balance.
     -- Decimal is the prefered Daml fixed-point (10 digits after the decimal point)
     -- It avoids the common binary floating-point rounding issues and also keeps 
     -- the Ledger API/PQS representations as decimal-strings
@@ -45,8 +99,23 @@ template BankAccount
     -- The key maintainer is the bank, so the bank owns the account namespace and authorizes key lookups.
     maintainer key._1
 
-    -- Sample invariant demonstration upon creation/recplacement: an account cannot represent a negative balance.
-    ensure balance >= 0.0
+    -- AdjustBalance lets the bank credit or debit an existing account.
+    choice AdjustBalance : ContractId BankAccount
+      with
+        -- Credit increases the balance, Debit decreases it.
+        adjustmentType : BalanceAdjustmentType
+        -- Positive amount to credit or debit.
+        amount : Decimal
+      controller bank
+      do
+        assertMsg "adjustment amount must be positive" (amount > 0.0)
+
+        let adjustedBalance = case adjustmentType of
+              Credit -> balance + amount
+              Debit -> balance - amount
+
+        create this with
+          balance = adjustedBalance
 
     -- RequestTransfer creates a payment instruction from this account owner to the bank.
     -- The owner can request the transfer, but it is the bank to execute it because the bank can see both accounts.
@@ -64,9 +133,18 @@ template BankAccount
         -- Some basic assertions
         -- Reject zero or negative transfers.
         assertMsg "transfer amount must be positive" (transferAmount > 0.0)
+        -- Reject self-transfers. Otherwise sender and receiver resolve to the same BankAccount
+        -- contract and the bank execution would try to consume/update the same immutable contract twice.
+        assertMsg "receiver must be different from sender" (receiver /= owner)
         -- Reject obviously underfunded transfer requests before the bank executes them.
         -- The bank checks again during execution because account state may change between request and execution.
         assertMsg "insufficient funds" (transferAmount <= balance)
+
+        -- Reject transfer requests to parties who are not onboarded as account holders at this bank.
+        -- This checks the visible directory, not the receiver's BankAccount, because Alice should not
+        -- see Bob's balance just to know that Bob can receive money.
+        (_, directory) <- fetchByKey @BankAccountDirectory bank
+        assertMsg "receiver has no BankAccount at this bank" (containsParty receiver directory.accountHolders)
 
         -- Create a transfer instruction visible to the bank.
         -- The bank later executes it and posts the debit/credit against involved accounts.
@@ -97,14 +175,18 @@ template TransferInstruction
     -- Viewers can see the instruction but cannot execute it.
     observer bank, viewers
 
-    -- Transfer instructions must always be for positive amounts.
-    ensure transferAmount > 0.0
+    -- Transfer instructions must always be for positive amounts and between different parties.
+    -- This protects direct template creation too, not only the BankAccount.RequestTransfer path.
+    ensure transferAmount > 0.0 && sender /= receiver
 
     -- Execute posts the requested transfer on the bank's account ledger.
     -- Only the bank can execute, because only the bank can see and update both customer accounts.
     choice Execute : ()
       controller bank
       do
+        -- Defensively reject invalid old/manual instructions before touching account contracts.
+        assertMsg "receiver must be different from sender" (receiver /= sender)
+
         -- Find the sender's current account by stable key.
         -- We query for up to 2 matches so we also can detect ongoing incosistency,
         -- an invalid duplicate-account state.
@@ -144,3 +226,7 @@ template TransferInstruction
         -- The choice intentionally returns no ContractIds since the demo interaction 
         -- is command/query driven, not raw-CID used
         pure ()
+
+containsParty : Party -> [Party] -> Bool
+containsParty target parties =
+  any (\party -> party == target) parties

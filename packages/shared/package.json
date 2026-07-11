@@ -1,0 +1,49 @@
+{
+  "name": "@canton-demo/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./demo-money": {
+      "types": "./dist/demo-money/index.d.ts",
+      "default": "./dist/demo-money/index.js"
+    },
+    "./demo-money/constants": {
+      "types": "./dist/demo-money/demo-money.constants.d.ts",
+      "default": "./dist/demo-money/demo-money.constants.js"
+    },
+    "./demo-money/api-constants": {
+      "types": "./dist/demo-money/demo-money-api.constants.d.ts",
+      "default": "./dist/demo-money/demo-money-api.constants.js"
+    },
+    "./demo-money/helpers": {
+      "types": "./dist/demo-money/demo-money.helpers.d.ts",
+      "default": "./dist/demo-money/demo-money.helpers.js"
+    },
+    "./demo-money/types": {
+      "types": "./dist/demo-money/demo-money.types.d.ts",
+      "default": "./dist/demo-money/demo-money.types.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "demo-money": ["dist/demo-money/index.d.ts"],
+      "demo-money/api-constants": ["dist/demo-money/demo-money-api.constants.d.ts"],
+      "demo-money/constants": ["dist/demo-money/demo-money.constants.d.ts"],
+      "demo-money/helpers": ["dist/demo-money/demo-money.helpers.d.ts"],
+      "demo-money/types": ["dist/demo-money/demo-money.types.d.ts"]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

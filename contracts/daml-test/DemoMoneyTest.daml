@@ -19,6 +19,13 @@ testBankAccountTransfer = script do
   petyo <- allocateParty "Petyo"
   gosho <- allocateParty "Gosho"
 
+  -- Bank publishes who is onboarded as an account holder.
+  -- Alice and Bob can see this directory, but it does not reveal account balances.
+  submit bank do
+    createCmd BankAccountDirectory with
+      bank
+      accountHolders = [alice, bob]
+
   -- Setup is submitted by Bank because BankAccount is the signatory.
   -- Alice starts with 50 and Petyo is added as observer/viewer.
   submit bank do
@@ -65,6 +72,21 @@ testBankAccountTransfer = script do
   -- Now Alice signs the transfer intent from her own account
   -- This creates a TransferInstruction but it does not update balances yet.
   [(aliceCid, _)] <- query @BankAccount alice
+
+  -- Petyo can observe accounts, but he has no BankAccount himself.
+  -- Alice can therefore not even create a valid transfer request to Petyo.
+  submitMustFail alice do
+    exerciseCmd aliceCid RequestTransfer with
+      receiver = petyo
+      transferAmount = 1.0
+
+  -- Self-transfers are invalid. They would otherwise make sender and receiver
+  -- resolve to the same BankAccount contract during bank execution.
+  submitMustFail alice do
+    exerciseCmd aliceCid RequestTransfer with
+      receiver = alice
+      transferAmount = 1.0
+
   transferInstructionCid <- submit alice do
     exerciseCmd aliceCid RequestTransfer with
       receiver = bob
@@ -90,8 +112,66 @@ testBankAccountTransfer = script do
 
   -- Extract the final account payloads from the query results.
   let [(_, aliceAccount)] = aliceAccounts
-  let [(_, bobAccount)] = bobAccounts
+  let [(bobCid, bobAccount)] = bobAccounts
 
   -- Final balance assertions proving the transfer was posted correctly
   assertMsg "Alice should have 40 after transfer" (aliceAccount.balance == 40.0)
   assertMsg "Bob should have 60 after transfer" (bobAccount.balance == 60.0)
+
+  -- Balance adjustment is controlled by Bank, even though Bob can see his account.
+  submitMustFail bob do
+    exerciseCmd bobCid AdjustBalance with
+      adjustmentType = Credit
+      amount = 1.0
+
+  -- Bank can credit an existing account.
+  _ <- submit bank do
+    exerciseCmd bobCid AdjustBalance with
+      adjustmentType = Credit
+      amount = 7.0
+
+  [(bobToppedUpCid, bobToppedUpAccount)] <- query @BankAccount bob
+  assertMsg "Bob should have 67 after bank credit" (bobToppedUpAccount.balance == 67.0)
+
+  -- Bank can also debit an existing account, as long as the balance stays non-negative.
+  _ <- submit bank do
+    exerciseCmd bobToppedUpCid AdjustBalance with
+      adjustmentType = Debit
+      amount = 2.0
+
+  [(bobAdjustedCid, bobAdjustedAccount)] <- query @BankAccount bob
+  assertMsg "Bob should have 65 after bank debit" (bobAdjustedAccount.balance == 65.0)
+
+  -- Bank can also debit below zero.
+  _ <- submit bank do
+    exerciseCmd bobAdjustedCid AdjustBalance with
+      adjustmentType = Debit
+      amount = 100.0
+
+  [(bobNegativeCid, bobNegativeAccount)] <- query @BankAccount bob
+  assertMsg "Bob should have -35 after bank debit below zero" (bobNegativeAccount.balance == -35.0)
+
+  -- Zero-amount adjustments are rejected.
+  submitMustFail bank do
+    exerciseCmd bobNegativeCid AdjustBalance with
+      adjustmentType = Credit
+      amount = 0.0
+
+  -- Bank can later onboard another party by issuing a BankAccount from the directory.
+  [(directoryCid, _)] <- query @BankAccountDirectory bank
+  _ <- submit bank do
+    exerciseCmd directoryCid IssueAccount with
+      owner = gosho
+      initialBalance = 5.0
+      viewers = [petyo]
+
+  goshoIssuedAccounts <- query @BankAccount gosho
+  assertMsg "Gosho should see his account after bank issuance" (length goshoIssuedAccounts == 1)
+
+  -- The same owner cannot be issued twice at the same bank.
+  [(updatedDirectoryCid, _)] <- query @BankAccountDirectory bank
+  submitMustFail bank do
+    exerciseCmd updatedDirectoryCid IssueAccount with
+      owner = gosho
+      initialBalance = 5.0
+      viewers = [petyo]

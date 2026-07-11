@@ -1,4 +1,28 @@
 services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3.1
+    container_name: canton-demo-keycloak
+    command:
+      - start-dev
+      - --import-realm
+      - --hostname-strict=false
+      - --http-enabled=true
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./config/keycloak/canton-demo-realm.json:/opt/keycloak/data/import/canton-demo-realm.json:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    networks:
+      - canton-demo
+
   canton-synchronizer:
     build:
       context: ./docker
@@ -13,6 +37,7 @@ services:
     volumes:
       - ./config/synchronizer.conf:/config/synchronizer.conf:ro
       - ./config/bootstrap-synchronizer.canton:/bootstrap/bootstrap-synchronizer.canton:ro
+      - synchronizer-data:/data
     ports:
       - "5001:5001"
       - "5002:5002"
@@ -52,6 +77,8 @@ services:
     image: canton-demo-canton:3.5.1
     container_name: canton-demo-participant-bank
     depends_on:
+      keycloak:
+        condition: service_healthy
       canton-synchronizer:
         condition: service_healthy
     environment:
@@ -63,9 +90,11 @@ services:
     volumes:
       - ./config/participant-bank.conf:/config/participant-bank.conf:ro
       - ./config/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+      - participant-bank-data:/data
     ports:
       - "5011:5011"
       - "5012:5012"
+      - "5013:5013"
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
       interval: 5s
@@ -79,6 +108,8 @@ services:
     image: europe-docker.pkg.dev/da-images/public/docker/participant-query-store:3.5.1
     container_name: canton-demo-pqs-bank
     depends_on:
+      keycloak:
+        condition: service_healthy
       participant-bank:
         condition: service_healthy
       pqs-postgres:
@@ -88,7 +119,7 @@ services:
       - ledger
       - postgres-document
       - --pipeline-ledger-start
-      - Latest
+      - Genesis
       - --pipeline-filter-parties
       - "*"
       - --source-ledger-host
@@ -96,7 +127,15 @@ services:
       - --source-ledger-port
       - "5011"
       - --source-ledger-auth
-      - NoAuth
+      - OAuth
+      - --pipeline-oauth-clientid
+      - canton-demo-pqs
+      - --pipeline-oauth-clientsecret
+      - canton-demo-pqs-secret
+      - --pipeline-oauth-endpoint
+      - http://keycloak:8080/realms/canton-demo/protocol/openid-connect/token
+      - --pipeline-oauth-scope
+      - daml_ledger_api
       - --target-postgres-host
       - pqs-postgres
       - --target-postgres-port
@@ -128,6 +167,8 @@ services:
     image: canton-demo-canton:3.5.1
     container_name: canton-demo-participant-users
     depends_on:
+      keycloak:
+        condition: service_healthy
       canton-synchronizer:
         condition: service_healthy
     environment:
@@ -139,9 +180,11 @@ services:
     volumes:
       - ./config/participant-users.conf:/config/participant-users.conf:ro
       - ./config/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+      - participant-users-data:/data
     ports:
       - "5021:5011"
       - "5022:5012"
+      - "5023:5013"
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
       interval: 5s
@@ -155,6 +198,8 @@ services:
     image: europe-docker.pkg.dev/da-images/public/docker/participant-query-store:3.5.1
     container_name: canton-demo-pqs-users
     depends_on:
+      keycloak:
+        condition: service_healthy
       participant-users:
         condition: service_healthy
       pqs-postgres:
@@ -164,7 +209,7 @@ services:
       - ledger
       - postgres-document
       - --pipeline-ledger-start
-      - Latest
+      - Genesis
       - --pipeline-filter-parties
       - "*"
       - --source-ledger-host
@@ -172,7 +217,15 @@ services:
       - --source-ledger-port
       - "5011"
       - --source-ledger-auth
-      - NoAuth
+      - OAuth
+      - --pipeline-oauth-clientid
+      - canton-demo-pqs
+      - --pipeline-oauth-clientsecret
+      - canton-demo-pqs-secret
+      - --pipeline-oauth-endpoint
+      - http://keycloak:8080/realms/canton-demo/protocol/openid-connect/token
+      - --pipeline-oauth-scope
+      - daml_ledger_api
       - --target-postgres-host
       - pqs-postgres
       - --target-postgres-port
@@ -204,6 +257,8 @@ services:
     image: canton-demo-canton:3.5.1
     container_name: canton-demo-participant-observer
     depends_on:
+      keycloak:
+        condition: service_healthy
       canton-synchronizer:
         condition: service_healthy
     environment:
@@ -215,9 +270,11 @@ services:
     volumes:
       - ./config/participant-observer.conf:/config/participant-observer.conf:ro
       - ./config/bootstrap-participant.canton:/bootstrap/bootstrap-participant.canton:ro
+      - participant-observer-data:/data
     ports:
       - "5031:5011"
       - "5032:5012"
+      - "5033:5013"
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/5011'"]
       interval: 5s
@@ -231,6 +288,8 @@ services:
     image: europe-docker.pkg.dev/da-images/public/docker/participant-query-store:3.5.1
     container_name: canton-demo-pqs-observer
     depends_on:
+      keycloak:
+        condition: service_healthy
       participant-observer:
         condition: service_healthy
       pqs-postgres:
@@ -240,7 +299,7 @@ services:
       - ledger
       - postgres-document
       - --pipeline-ledger-start
-      - Latest
+      - Genesis
       - --pipeline-filter-parties
       - "*"
       - --source-ledger-host
@@ -248,7 +307,15 @@ services:
       - --source-ledger-port
       - "5011"
       - --source-ledger-auth
-      - NoAuth
+      - OAuth
+      - --pipeline-oauth-clientid
+      - canton-demo-pqs
+      - --pipeline-oauth-clientsecret
+      - canton-demo-pqs-secret
+      - --pipeline-oauth-endpoint
+      - http://keycloak:8080/realms/canton-demo/protocol/openid-connect/token
+      - --pipeline-oauth-scope
+      - daml_ledger_api
       - --target-postgres-host
       - pqs-postgres
       - --target-postgres-port
@@ -272,6 +339,71 @@ services:
     networks:
       - canton-demo
 
+  backend:
+    image: node:22-alpine
+    container_name: canton-demo-backend
+    working_dir: /app
+    command: sh -lc "npm install && npm run start:dev"
+    volumes:
+      - ./backend:/app
+      - ./packages/shared:/packages/shared:ro
+      - ./.demo:/demo:ro
+      - backend-node-modules:/app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      pqs-postgres:
+        condition: service_healthy
+      participant-bank:
+        condition: service_healthy
+      participant-users:
+        condition: service_healthy
+      participant-observer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    networks:
+      - canton-demo
+
+  frontend:
+    image: node:22-alpine
+    container_name: canton-demo-frontend
+    working_dir: /app
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      BACKEND_TARGET: http://backend:3000
+    volumes:
+      - ./frontend:/app
+      - ./packages/shared:/packages/shared:ro
+      - frontend-node-modules:/app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5173 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
+    networks:
+      - canton-demo
+
 networks:
   canton-demo:
     driver: bridge
+
+volumes:
+  synchronizer-data:
+  participant-bank-data:
+  participant-users-data:
+  participant-observer-data:
+  backend-node-modules:
+  frontend-node-modules:

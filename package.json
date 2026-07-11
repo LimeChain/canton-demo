@@ -1,0 +1,21 @@
+{
+  "name": "canton-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "tsx scripts/canton-demo.ts start",
+    "start:infra": "tsx scripts/canton-demo.ts start-infra",
+    "stop:infra": "tsx scripts/canton-demo.ts stop-infra",
+    "clean:infra": "tsx scripts/canton-demo.ts clean-infra",
+    "build:contracts": "tsx scripts/canton-demo.ts build-contracts",
+    "test:contracts": "tsx scripts/canton-demo.ts test-contracts",
+    "deploy:contracts": "tsx scripts/canton-demo.ts deploy-contracts",
+    "typecheck:scripts": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.6",
+    "tsx": "^4.20.6",
+    "typescript": "^5.7.3"
+  }
+}
