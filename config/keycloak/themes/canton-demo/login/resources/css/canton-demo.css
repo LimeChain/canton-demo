@@ -1,0 +1,427 @@
+:root {
+  --demo-ink: #18201d;
+  --demo-muted: #65716c;
+  --demo-line: #d9d4c8;
+  --demo-panel: #fffdf7;
+  --demo-bg: #f4f1e9;
+  --demo-accent: #0d6b57;
+  --demo-accent-strong: #094738;
+  --demo-shadow: 0 18px 45px rgba(33, 34, 28, 0.12);
+  --demo-glass: rgba(255, 253, 247, 0.24);
+}
+
+.login-pf,
+.login-pf body {
+  background: var(--demo-bg);
+  color: var(--demo-ink);
+  font-family:
+    "Avenir Next",
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  min-height: 100vh;
+}
+
+.login-pf body {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.login-pf body::before {
+  background:
+    linear-gradient(120deg, rgba(13, 107, 87, 0.16), transparent 32%),
+    linear-gradient(250deg, rgba(24, 32, 29, 0.1), transparent 44%),
+    linear-gradient(35deg, transparent 22%, rgba(255, 253, 247, 0.5) 44%, transparent 68%),
+    linear-gradient(180deg, rgba(255, 253, 247, 0.32), rgba(217, 212, 200, 0.22));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+}
+
+.pf-v5-c-login {
+  align-items: center;
+  display: grid;
+  min-height: 100vh;
+  padding: 30px;
+  position: relative;
+}
+
+.pf-v5-c-login__container,
+.login-pf-page {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-areas:
+    "header"
+    "main";
+  grid-template-columns: minmax(0, 460px);
+  justify-content: center;
+  justify-items: stretch;
+  margin: 0;
+  max-width: 460px;
+  padding: 0;
+  width: min(100%, 460px);
+}
+
+#kc-header {
+  justify-self: stretch;
+  grid-area: header;
+  margin: 0;
+}
+
+#kc-header-wrapper {
+  color: var(--demo-accent);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 0;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+#kc-header-wrapper::after {
+  color: var(--demo-ink);
+  content: "Sign in to your account";
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.05;
+  margin-top: 10px;
+  text-transform: none;
+}
+
+.pf-v5-c-login__main {
+  -webkit-backdrop-filter: blur(9.5px);
+  backdrop-filter: blur(9.5px);
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  grid-area: main;
+  overflow: hidden;
+}
+
+.pf-v5-c-login__main-header {
+  display: none;
+}
+
+.pf-v5-c-login__main-body {
+  padding: 42px 44px 40px;
+}
+
+.card-pf {
+  -webkit-backdrop-filter: blur(9.5px);
+  backdrop-filter: blur(9.5px);
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  margin: 0;
+  overflow: hidden;
+  padding: 30px;
+}
+
+#kc-page-title {
+  display: none;
+}
+
+.pf-v5-c-form__label,
+.pf-v5-c-form__label-text,
+.pf-c-form__label,
+.pf-c-form__label-text,
+label {
+  color: var(--demo-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pf-v5-c-form,
+.pf-c-form {
+  gap: 22px;
+}
+
+.pf-v5-c-form__group,
+.pf-c-form__group {
+  margin-bottom: 0;
+}
+
+.pf-v5-c-form-control,
+.pf-c-form-control,
+input[type="text"],
+input[type="password"] {
+  background: var(--demo-panel);
+  border: 1px solid var(--demo-line) !important;
+  border-radius: 6px;
+  box-shadow: none !important;
+  color: var(--demo-ink);
+  font: inherit;
+  min-height: 42px;
+  outline: 0 !important;
+  width: 100%;
+}
+
+.pf-v5-c-form-control::before,
+.pf-v5-c-form-control::after,
+.pf-c-form-control::before,
+.pf-c-form-control::after {
+  display: none;
+}
+
+.pf-v5-c-form-control input,
+.pf-c-form-control input {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  border: 0 !important;
+  box-shadow: none !important;
+  height: 42px;
+  outline: 0 !important;
+}
+
+#kc-form-login input:focus,
+#kc-form-login input:focus-visible {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-form-control:focus,
+.pf-c-form-control:focus,
+.pf-v5-c-form-control:focus-within,
+.pf-c-form-control:focus-within,
+input[type="text"]:focus,
+input[type="password"]:focus {
+  border-color: var(--demo-accent);
+  box-shadow: 0 0 0 3px rgba(13, 107, 87, 0.16) !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-form-control input:focus,
+.pf-c-form-control input:focus {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-input-group,
+.pf-c-input-group {
+  --pf-v5-c-input-group__item--offset: 0;
+  --pf-v5-c-input-group__item--MarginLeft: 0;
+  --pf-v5-c-input-group__item--m-box--BorderWidth: 0;
+  --pf-v5-c-input-group__item--m-box--BorderTopColor: transparent;
+  --pf-v5-c-input-group__item--m-box--BorderRightColor: transparent;
+  --pf-v5-c-input-group__item--m-box--BorderBottomColor: transparent;
+  --pf-v5-c-input-group__item--m-box--BorderLeftColor: transparent;
+  --pf-v5-c-button--after--BorderWidth: 0;
+  --pf-v5-c-button--after--BorderColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderWidth: 0;
+  --pf-v5-c-button--m-control--after--BorderTopColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderRightColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderLeftColor: transparent;
+  --pf-v5-c-button--m-control--hover--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--hover--after--BorderBottomWidth: 0;
+  --pf-v5-c-button--m-control--focus--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--focus--after--BorderBottomWidth: 0;
+  --pf-v5-c-button--m-control--active--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--active--after--BorderBottomWidth: 0;
+  --pf-v5-c-button--m-control--BorderColor: transparent;
+  --pf-v5-c-form-control--BorderWidth: 0;
+  --pf-v5-c-form-control--after--BorderWidth: 0;
+  --pf-v5-c-input-group__item--BorderWidth: 0;
+  background: var(--demo-panel);
+  border: 1px solid var(--demo-line) !important;
+  border-radius: 6px;
+  box-shadow: none !important;
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.pf-v5-c-input-group:focus-within,
+.pf-c-input-group:focus-within {
+  border-color: var(--demo-line) !important;
+  box-shadow: 0 0 0 3px rgba(13, 107, 87, 0.16) !important;
+}
+
+.pf-v5-c-input-group__item,
+.pf-c-input-group__item {
+  background: transparent !important;
+  border: 0 !important;
+  border-inline-start: 0 !important;
+  border-inline-end: 0 !important;
+  box-shadow: none !important;
+  min-width: 0;
+  outline: 0 !important;
+}
+
+.pf-v5-c-input-group__item:where(:not(:first-child)),
+.pf-c-input-group__item:where(:not(:first-child)),
+.pf-v5-c-input-group > * + *,
+.pf-c-input-group > * + * {
+  border-inline-start: 0 !important;
+  margin-inline-start: 0 !important;
+}
+
+.pf-v5-c-input-group__item::before,
+.pf-v5-c-input-group__item::after,
+.pf-c-input-group__item::before,
+.pf-c-input-group__item::after {
+  display: none !important;
+}
+
+.pf-v5-c-input-group__item.pf-m-fill,
+.pf-c-input-group__item.pf-m-fill {
+  flex: 1;
+}
+
+.pf-v5-c-input-group .pf-v5-c-form-control,
+.pf-c-input-group .pf-c-form-control {
+  background: transparent;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-input-group .pf-v5-c-form-control:focus,
+.pf-v5-c-input-group .pf-v5-c-form-control:focus-visible,
+.pf-v5-c-input-group .pf-v5-c-form-control:focus-within,
+.pf-c-input-group .pf-c-form-control:focus,
+.pf-c-input-group .pf-c-form-control:focus-visible,
+.pf-c-input-group .pf-c-form-control:focus-within {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-input-group input,
+.pf-c-input-group input {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-input-group input:focus,
+.pf-v5-c-input-group input:focus-visible,
+.pf-c-input-group input:focus,
+.pf-c-input-group input:focus-visible {
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-button,
+.pf-c-button,
+input[type="submit"] {
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.pf-v5-c-button.pf-m-primary,
+.pf-c-button.pf-m-primary,
+input[type="submit"] {
+  background: var(--demo-accent);
+  border: 0;
+  color: var(--demo-panel);
+  min-height: 42px;
+}
+
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:hover,
+input[type="submit"]:hover {
+  background: var(--demo-accent-strong);
+}
+
+.pf-v5-c-button.pf-m-control,
+.pf-c-button.pf-m-control {
+  --pf-v5-c-button--after--BorderWidth: 0;
+  --pf-v5-c-button--after--BorderColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderWidth: 0;
+  --pf-v5-c-button--m-control--after--BorderTopColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderRightColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--after--BorderLeftColor: transparent;
+  --pf-v5-c-button--m-control--hover--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--hover--after--BorderBottomWidth: 0;
+  --pf-v5-c-button--m-control--focus--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--focus--after--BorderBottomWidth: 0;
+  --pf-v5-c-button--m-control--active--after--BorderBottomColor: transparent;
+  --pf-v5-c-button--m-control--active--after--BorderBottomWidth: 0;
+  --pf-v5-c-button--m-control--BorderColor: transparent;
+  background: transparent;
+  border: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  color: var(--demo-muted);
+  height: 42px;
+  min-width: 54px;
+  outline: 0 !important;
+}
+
+.pf-v5-c-button.pf-m-control:focus,
+.pf-v5-c-button.pf-m-control:focus-visible,
+.pf-c-button.pf-m-control:focus,
+.pf-c-button.pf-m-control:focus-visible {
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.pf-v5-c-button.pf-m-control::before,
+.pf-v5-c-button.pf-m-control::after,
+.pf-c-button.pf-m-control::before,
+.pf-c-button.pf-m-control::after {
+  border: 0 !important;
+  border-block-end-width: 0 !important;
+  content: none !important;
+  display: none !important;
+}
+
+#kc-form-options,
+#kc-registration,
+#kc-info {
+  color: var(--demo-muted);
+  font-size: 13px;
+}
+
+a,
+.pf-v5-c-button.pf-m-link,
+.pf-c-button.pf-m-link {
+  color: var(--demo-accent);
+}
+
+a:hover,
+.pf-v5-c-button.pf-m-link:hover,
+.pf-c-button.pf-m-link:hover {
+  color: var(--demo-accent-strong);
+}
+
+.pf-v5-c-alert,
+.pf-c-alert {
+  border-radius: 8px;
+}
+
+@media (max-width: 520px) {
+  .pf-v5-c-login {
+    padding: 18px;
+  }
+
+  .pf-v5-c-login__main,
+  .card-pf {
+    padding: 22px;
+  }
+
+  #kc-header-wrapper::after {
+    font-size: 24px;
+  }
+}

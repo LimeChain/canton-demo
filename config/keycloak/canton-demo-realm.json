@@ -1,5 +1,7 @@
 {
   "realm": "canton-demo",
+  "displayName": "Canton Demo",
+  "loginTheme": "canton-demo",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,
