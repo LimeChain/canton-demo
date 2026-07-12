@@ -12,15 +12,3 @@ export class VisibleAccountNotFoundException extends NotFoundException {
     super(`No visible BankAccount for ${owner}`);
   }
 }
-
-export class MissingSenderAccountException extends BadRequestException {
-  constructor(actor: PartyAlias) {
-    super(`Logged-in party "${actor}" has no visible BankAccount to send from.`);
-  }
-}
-
-export class VisibleAccountDirectoryNotFoundException extends NotFoundException {
-  constructor() {
-    super('No visible BankAccountDirectory for the logged-in party.');
-  }
-}

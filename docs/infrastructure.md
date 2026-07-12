@@ -53,6 +53,22 @@ We keep multiple participants to demonstrate a more realistic network shape:
 - Alice, Bob, and Gosho share one user participant.
 - Petyo is hosted on a separate observer participant.
 
+
+### Command Execution Flow
+
+The Daml package is uploaded to the participants. The participants need the package so they can interpret templates, choices, keys, and payloads. The synchronizer (sequencer + mediator) on other hand coordinates the transaction protocol between participants.
+
+A write command flows like this:
+
+1. Backend submits a command to a participant JSON API.
+2. The participant interprets the Daml command using its installed DAR.
+3. The participant determines which other participants and stakeholders are involved.
+4. Participants exchange Canton protocol messages through the synchronizer.
+5. The sequencer orders and delivers those protocol messages.
+6. The mediator collects confirmations and emits the transaction verdict.
+7. Participants update their local contract stores if the transaction is accepted.
+8. PQS reads each participant's ledger stream and projects visible state to Postgres.
+
 ## Application Services
 
 ### Keycloak

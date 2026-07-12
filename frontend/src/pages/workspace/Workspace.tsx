@@ -269,8 +269,8 @@ export function Workspace() {
             <p className="empty">No Pending Transfer Instructions</p>
           ) : (
             <div className="table">
-              {instructions.map((instruction) => (
-                <div className="row" key={instruction.contractId}>
+              {instructions.map((instruction, index) => (
+                <div className="row" key={`${instruction.senderParty}-${instruction.receiverParty}-${instruction.amount}-${index}`}>
                   <span>
                     {instruction.sender} to {instruction.receiver}
                   </span>

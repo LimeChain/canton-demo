@@ -11,14 +11,12 @@ export type ActorSessionDto = {
 };
 
 export type AccountDto = {
-  contractId: string;
   owner: PartyAlias | string;
   ownerParty: string;
   balance: string;
 };
 
 export type PendingTransferDto = {
-  contractId: string;
   sender: PartyAlias | string;
   senderParty: string;
   receiver: PartyAlias | string;

@@ -45,11 +45,11 @@ export class PqsRepository implements OnModuleDestroy {
     }));
   }
 
-  async findActiveByOwner<TPayload>(
+  async findActiveByContractKey<TPayload>(
     actor: PartyAlias,
     actorParty: string,
     templateFqn: string,
-    ownerParty: string,
+    contractKey: unknown,
   ): Promise<PqsContract<TPayload> | undefined> {
     const pool = this.poolFor(actor);
     const result = await pool.query<{ contract_id: string; payload: TPayload }>(
@@ -57,11 +57,11 @@ export class PqsRepository implements OnModuleDestroy {
         select contract_id, payload
         from active($1) a
         where stakeholders(a.*) @> array[$2]::text[]
-          and payload->>'owner' = $3
+          and contract_key = $3::jsonb
         order by created_at_offset desc, created_at_ix desc
         limit 1
       `,
-      [templateFqn, actorParty, ownerParty],
+      [templateFqn, actorParty, JSON.stringify(contractKey)],
     );
 
     const row = result.rows[0];

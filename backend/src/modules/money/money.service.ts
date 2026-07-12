@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  PARTY_ALIAS_BANK,
   PARTY_ALIAS_PETYO,
   formatDecimal,
   type AccountDto,
@@ -12,7 +13,6 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import {
-  BANK_ACCOUNT_DIRECTORY_PQS_TEMPLATE_FQN,
   BANK_ACCOUNT_DIRECTORY_TEMPLATE,
   BANK_ACCOUNT_DIRECTORY_TEMPLATE_ID,
   BANK_ACCOUNT_PQS_TEMPLATE_FQN,
@@ -26,16 +26,7 @@ import type { AuthenticatedUser } from '../auth/auth.service';
 import { LedgerClient } from '../ledger/ledger.client';
 import { PartiesService } from '../parties/parties.service';
 import { PqsRepository, type PqsContract } from '../pqs/pqs.repository';
-import {
-  MissingSenderAccountException,
-  VisibleAccountNotFoundException,
-  VisibleAccountDirectoryNotFoundException,
-} from './money.exception';
-import type {
-  BankAccountDirectoryPayload,
-  BankAccountPayload,
-  TransferInstructionPayload,
-} from './money.types';
+import type { BankAccountPayload, TransferInstructionPayload } from './money.types';
 
 @Injectable()
 export class MoneyService {
@@ -72,11 +63,11 @@ export class MoneyService {
   ): Promise<AccountDto | undefined> {
     const context = await this.partiesService.actorContext(actor);
     const account =
-      await this.pqsRepository.findActiveByOwner<BankAccountPayload>(
+      await this.pqsRepository.findActiveByContractKey<BankAccountPayload>(
         actor,
         context.actorParty,
         BANK_ACCOUNT_PQS_TEMPLATE_FQN,
-        context.parties[owner],
+        this.bankAccountKey(context.parties[PARTY_ALIAS_BANK], context.parties[owner]),
       );
 
     return account ? this.toAccountDto(account, context.parties) : undefined;
@@ -102,17 +93,7 @@ export class MoneyService {
     amount: string,
   ): Promise<unknown> {
     const context = await this.partiesService.actorContext(user.actor);
-    const sourceAccount =
-      await this.pqsRepository.findActiveByOwner<BankAccountPayload>(
-        user.actor,
-        context.actorParty,
-        BANK_ACCOUNT_PQS_TEMPLATE_FQN,
-        context.actorParty,
-      );
-
-    if (!sourceAccount) {
-      throw new MissingSenderAccountException(user.actor);
-    }
+    const bankParty = context.parties[PARTY_ALIAS_BANK];
 
     return this.ledgerClient.submitAndWait(user.token, user.actor, {
       userId: user.actor,
@@ -120,9 +101,9 @@ export class MoneyService {
       actAs: [context.actorParty],
       commands: [
         {
-          ExerciseCommand: {
+          ExerciseByKeyCommand: {
             templateId: BANK_ACCOUNT_TEMPLATE_ID,
-            contractId: sourceAccount.contractId,
+            contractKey: this.bankAccountKey(bankParty, context.actorParty),
             choice: BANK_ACCOUNT_TEMPLATE.RequestTransfer.choiceName,
             choiceArgument: BANK_ACCOUNT_TEMPLATE.RequestTransfer.argumentEncode({
               receiver: context.parties[receiver],
@@ -140,8 +121,7 @@ export class MoneyService {
     initialBalance: string,
   ): Promise<unknown> {
     const context = await this.partiesService.actorContext(user.actor);
-    const directory =
-      await this.findVisibleBankAccountDirectory(user.actor, context.actorParty);
+    const bankParty = context.parties[PARTY_ALIAS_BANK];
 
     return this.ledgerClient.submitAndWait(user.token, user.actor, {
       userId: user.actor,
@@ -149,9 +129,9 @@ export class MoneyService {
       actAs: [context.actorParty],
       commands: [
         {
-          ExerciseCommand: {
+          ExerciseByKeyCommand: {
             templateId: BANK_ACCOUNT_DIRECTORY_TEMPLATE_ID,
-            contractId: directory.contractId,
+            contractKey: BANK_ACCOUNT_DIRECTORY_TEMPLATE.keyEncode(bankParty),
             choice: BANK_ACCOUNT_DIRECTORY_TEMPLATE.IssueAccount.choiceName,
             choiceArgument:
               BANK_ACCOUNT_DIRECTORY_TEMPLATE.IssueAccount.argumentEncode({
@@ -172,17 +152,7 @@ export class MoneyService {
     amount: string,
   ): Promise<unknown> {
     const context = await this.partiesService.actorContext(user.actor);
-    const account =
-      await this.pqsRepository.findActiveByOwner<BankAccountPayload>(
-        user.actor,
-        context.actorParty,
-        BANK_ACCOUNT_PQS_TEMPLATE_FQN,
-        context.parties[owner],
-      );
-
-    if (!account) {
-      throw new VisibleAccountNotFoundException(owner);
-    }
+    const bankParty = context.parties[PARTY_ALIAS_BANK];
 
     return this.ledgerClient.submitAndWait(user.token, user.actor, {
       userId: user.actor,
@@ -190,9 +160,9 @@ export class MoneyService {
       actAs: [context.actorParty],
       commands: [
         {
-          ExerciseCommand: {
+          ExerciseByKeyCommand: {
             templateId: BANK_ACCOUNT_TEMPLATE_ID,
-            contractId: account.contractId,
+            contractKey: this.bankAccountKey(bankParty, context.parties[owner]),
             choice: BANK_ACCOUNT_TEMPLATE.AdjustBalance.choiceName,
             choiceArgument: BANK_ACCOUNT_TEMPLATE.AdjustBalance.argumentEncode({
               adjustmentType,
@@ -247,7 +217,6 @@ export class MoneyService {
     parties: Record<PartyAlias, string>,
   ): AccountDto {
     return {
-      contractId: account.contractId,
       owner: this.aliasForParty(parties, account.payload.owner),
       ownerParty: account.payload.owner,
       balance: formatDecimal(account.payload.balance),
@@ -259,7 +228,6 @@ export class MoneyService {
     parties: Record<PartyAlias, string>,
   ): PendingTransferDto {
     return {
-      contractId: instruction.contractId,
       sender: this.aliasForParty(parties, instruction.payload.sender),
       senderParty: instruction.payload.sender,
       receiver: this.aliasForParty(parties, instruction.payload.receiver),
@@ -273,23 +241,11 @@ export class MoneyService {
     return match ? (match[0] as PartyAlias) : party;
   }
 
-  private async findVisibleBankAccountDirectory(
-    actor: PartyAlias,
-    actorParty: string,
-  ): Promise<PqsContract<BankAccountDirectoryPayload>> {
-    const directories =
-      await this.pqsRepository.findActiveByTemplate<BankAccountDirectoryPayload>(
-        actor,
-        actorParty,
-        BANK_ACCOUNT_DIRECTORY_PQS_TEMPLATE_FQN,
-      );
-
-    const directory = directories[0];
-    if (!directory) {
-      throw new VisibleAccountDirectoryNotFoundException();
-    }
-
-    return directory;
+  private bankAccountKey(bankParty: string, ownerParty: string): unknown {
+    return BANK_ACCOUNT_TEMPLATE.keyEncode({
+      _1: bankParty,
+      _2: ownerParty,
+    });
   }
 
   private commandId(prefix: string): string {
