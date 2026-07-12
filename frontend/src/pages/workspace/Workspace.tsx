@@ -286,8 +286,9 @@ export function Workspace() {
           </button>
         </div>
 
-        <ResultPanel result={result} />
       </section>
+
+      <ResultPanel result={result} />
     </main>
   );
 }
