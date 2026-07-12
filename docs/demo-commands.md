@@ -32,6 +32,8 @@ When it finishes, open:
 http://localhost:5173
 ```
 
+And it might take a while when running for a first time, so bare with me.
+
 ## Other Terminal commands
 
 | Command | Purpose |
