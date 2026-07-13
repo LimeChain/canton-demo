@@ -1,10 +1,7 @@
-import { Banknote, CircleDollarSign, LogOut, Play, Search, Send, UserPlus, UserRound } from 'lucide-react';
 import {
   PARTY_ALIAS_ALICE,
   PARTY_ALIAS_BOB,
   PARTY_ALIAS_GOSHO,
-  PARTY_ALIASES,
-  formatDecimal,
   type BalanceAdjustmentType,
   type PartyAlias,
   type PendingTransferDto,
@@ -22,6 +19,14 @@ import {
   queryAccount,
   requestTransfer,
 } from '../../services/api/demo-money/demoMoneyApi';
+import {
+  AccountQueryPanel,
+  BalanceAdjustmentPanel,
+  IssueAccountPanel,
+  PendingTransfersPanel,
+  TransferRequestPanel,
+  WorkspaceHeader,
+} from './components';
 import { blankResult, defaultReceiverFor, errorToResult } from './Workspace.helpers';
 import type { ActionTitles } from './Workspace.types';
 
@@ -110,182 +115,46 @@ export function Workspace() {
 
   return (
     <main className="app-shell">
-      <section className="topbar">
-        <div>
-          <p className="eyebrow">Canton demo</p>
-          <h1>Money transfer workspace</h1>
-        </div>
-        <div className="identity">
-          <UserRound size={18} />
-          <div>
-            <strong>{session.actor}</strong>
-            <span>{session.actorParty}</span>
-          </div>
-          <button type="button" onClick={logout}>
-            <LogOut size={16} />
-            Logout
-          </button>
-        </div>
-      </section>
+      <WorkspaceHeader session={session} onLogout={logout} />
 
       <section className="workspace">
-        <div className="panel">
-          <div className="panel-title">
-            <Search size={18} />
-            <h2>Query account</h2>
-          </div>
+        <AccountQueryPanel
+          owner={queryOwner}
+          onOwnerChange={setQueryOwner}
+          onQuery={querySelectedAccount}
+          disabled={busy}
+        />
 
-          <div className="form-grid two-columns">
-            <label>
-              Owner
-              <select value={queryOwner} onChange={(event) => setQueryOwner(event.target.value as PartyAlias)}>
-                {PARTY_ALIASES.map((alias) => (
-                  <option key={alias} value={alias}>
-                    {alias}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <TransferRequestPanel
+          receiver={receiver}
+          amount={amount}
+          onReceiverChange={setReceiver}
+          onAmountChange={setAmount}
+          onRequest={submitTransferRequest}
+          disabled={busy}
+        />
 
-            <button type="button" onClick={querySelectedAccount} disabled={busy}>
-              <Search size={16} />
-              Query
-            </button>
-          </div>
-        </div>
+        <IssueAccountPanel
+          owner={issueOwner}
+          initialBalance={issueInitialBalance}
+          onOwnerChange={setIssueOwner}
+          onInitialBalanceChange={setIssueInitialBalance}
+          onIssue={submitIssueAccount}
+          disabled={busy}
+        />
 
-        <div className="panel">
-          <div className="panel-title">
-            <Send size={18} />
-            <h2>Send money</h2>
-          </div>
+        <BalanceAdjustmentPanel
+          owner={adjustOwner}
+          adjustmentType={adjustmentType}
+          amount={adjustAmount}
+          onOwnerChange={setAdjustOwner}
+          onAdjustmentTypeChange={setAdjustmentType}
+          onAmountChange={setAdjustAmount}
+          onAdjust={submitBalanceAdjustment}
+          disabled={busy}
+        />
 
-          <div className="form-grid two-columns">
-            <label>
-              Receiver
-              <select value={receiver} onChange={(event) => setReceiver(event.target.value as PartyAlias)}>
-                {PARTY_ALIASES.map((alias) => (
-                  <option key={alias} value={alias}>
-                    {alias}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Amount
-              <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" />
-            </label>
-          </div>
-
-          <button type="button" onClick={submitTransferRequest} disabled={busy}>
-            <Banknote size={16} />
-            Request transfer
-          </button>
-        </div>
-
-        <div className="panel">
-          <div className="panel-title">
-            <UserPlus size={18} />
-            <h2>Issue account</h2>
-          </div>
-
-          <div className="form-grid two-columns">
-            <label>
-              Owner
-              <select value={issueOwner} onChange={(event) => setIssueOwner(event.target.value as PartyAlias)}>
-                {PARTY_ALIASES.map((alias) => (
-                  <option key={alias} value={alias}>
-                    {alias}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Initial balance
-              <input
-                value={issueInitialBalance}
-                onChange={(event) => setIssueInitialBalance(event.target.value)}
-                inputMode="decimal"
-              />
-            </label>
-          </div>
-
-          <button type="button" onClick={submitIssueAccount} disabled={busy}>
-            <UserPlus size={16} />
-            Issue BankAccount
-          </button>
-        </div>
-
-        <div className="panel">
-          <div className="panel-title">
-            <CircleDollarSign size={18} />
-            <h2>Adjust balance</h2>
-          </div>
-
-          <div className="form-grid">
-            <label>
-              Owner
-              <select value={adjustOwner} onChange={(event) => setAdjustOwner(event.target.value as PartyAlias)}>
-                {PARTY_ALIASES.map((alias) => (
-                  <option key={alias} value={alias}>
-                    {alias}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label>
-              Type
-              <select
-                value={adjustmentType}
-                onChange={(event) => setAdjustmentType(event.target.value as BalanceAdjustmentType)}
-              >
-                <option value="Credit">Credit</option>
-                <option value="Debit">Debit</option>
-              </select>
-            </label>
-
-            <label>
-              Amount
-              <input value={adjustAmount} onChange={(event) => setAdjustAmount(event.target.value)} inputMode="decimal" />
-            </label>
-          </div>
-
-          <button type="button" onClick={submitBalanceAdjustment} disabled={busy}>
-            <CircleDollarSign size={16} />
-            Adjust balance
-          </button>
-        </div>
-
-        <div className="panel instructions-panel">
-          <div className="panel-title">
-            <Play size={18} />
-            <h2>Authorize transfers</h2>
-          </div>
-
-          {instructions.length === 0 ? (
-            <p className="empty">No Pending Transfer Instructions</p>
-          ) : (
-            <div className="table">
-              {instructions.map((instruction, index) => (
-                <div className="row" key={`${instruction.senderParty}-${instruction.receiverParty}-${instruction.amount}-${index}`}>
-                  <span>
-                    {instruction.sender} to {instruction.receiver}
-                  </span>
-                  <strong>{formatDecimal(instruction.amount)}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button type="button" onClick={authorizePendingTransfers} disabled={busy}>
-            <Play size={16} />
-            Process pending
-          </button>
-        </div>
-
+        <PendingTransfersPanel instructions={instructions} onAuthorize={authorizePendingTransfers} disabled={busy} />
       </section>
 
       <ResultPanel result={result} />
