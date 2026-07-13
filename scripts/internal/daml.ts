@@ -251,9 +251,8 @@ function bindingsExist(): boolean {
 }
 
 async function waitForParticipants(): Promise<void> {
-  const token = readText('.demo/admin.token');
-
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    const token = writeAuthFiles();
     await waitForParticipantPorts();
     await waitForSynchronizerConnections(token);
     await sleep(2_000);
@@ -261,9 +260,8 @@ async function waitForParticipants(): Promise<void> {
 }
 
 async function uploadContractDars(): Promise<void> {
-  const token = readText('.demo/admin.token');
-
   for (const url of JSON_API_URLS) {
+    const token = writeAuthFiles();
     await uploadContractDar(url, token);
   }
 }
@@ -327,7 +325,7 @@ async function runDamlScript(scriptName: string, fileFlag: '--input-file' | '--o
 }
 
 function runDamlScriptOnce(scriptName: string, fileFlag: '--input-file' | '--output-file'): void {
-  const adminUserId = jwtSub(readText('.demo/admin.token'));
+  const adminUserId = jwtSub(writeAuthFiles());
 
   runContracts([
     'dpm',
@@ -374,6 +372,7 @@ async function grantDemoUsersWithRetry(): Promise<boolean> {
 }
 
 function grantDemoUsers(): void {
+  writeAuthFiles();
   const pqsUserId = jwtSub(fetchPqsToken());
   const parties = loadParties();
   writeText('.demo/grant-users.sc', grantConsoleScript(pqsUserId, parties));

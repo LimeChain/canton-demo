@@ -21,11 +21,13 @@ export function fetchPqsToken(): string {
   return fetchClientToken(KEYCLOAK_PQS_CLIENT_ID, KEYCLOAK_PQS_CLIENT_SECRET, KEYCLOAK_PQS_SCOPE);
 }
 
-export function writeAuthFiles(): void {
+export function writeAuthFiles(): string {
   ensureDir('.demo');
   const token = fetchAdminToken();
   writeText('.demo/admin.token', token);
   writeText('.demo/canton-console-auth.conf', cantonConsoleAuthConfig(token));
+
+  return token;
 }
 
 export function jwtSub(token: string): string {
