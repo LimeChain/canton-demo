@@ -27,7 +27,12 @@ import {
   TransferRequestPanel,
   WorkspaceHeader,
 } from './components';
-import { blankResult, defaultReceiverFor, errorToResult } from './Workspace.helpers';
+import {
+  blankResult,
+  defaultReceiverFor,
+  errorToResult,
+  waitForPendingTransfersChange,
+} from './Workspace.helpers';
 import type { ActionTitles } from './Workspace.types';
 
 export function Workspace() {
@@ -46,8 +51,10 @@ export function Workspace() {
   const [busy, setBusy] = useState<boolean>(false);
 
   // HELPERS
-  async function refreshPendingTransfers() {
-    setInstructions(await listPendingTransfers());
+  async function refreshPendingTransfers(): Promise<PendingTransferDto[]> {
+    const nextInstructions = await listPendingTransfers();
+    setInstructions(nextInstructions);
+    return nextInstructions;
   }
 
   async function querySelectedAccount() {
@@ -58,8 +65,12 @@ export function Workspace() {
   }
 
   async function submitTransferRequest() {
-    await runAction({ success: 'Transfer request submitted', failure: 'Transfer request failed' }, () =>
-      requestTransfer(receiver, amount),
+    const previousInstructions = instructions;
+
+    await runAction(
+      { success: 'Transfer request submitted', failure: 'Transfer request failed' },
+      () => requestTransfer(receiver, amount),
+      () => waitForPendingTransfersChange(listPendingTransfers, previousInstructions),
     );
   }
 
@@ -76,18 +87,25 @@ export function Workspace() {
   }
 
   async function authorizePendingTransfers() {
+    const previousInstructions = instructions;
+
     await runAction(
       { success: 'Pending transfer processing attempted', failure: 'Pending transfer processing failed' },
       () => processPendingTransfers(),
+      () => waitForPendingTransfersChange(listPendingTransfers, previousInstructions),
     );
   }
 
-  async function runAction(titles: ActionTitles, action: () => Promise<unknown>) {
+  async function runAction(
+    titles: ActionTitles,
+    action: () => Promise<unknown>,
+    refreshInstructions = listPendingTransfers,
+  ) {
     setBusy(true);
     try {
       const response = await action();
       setResult({ ok: true, title: titles.success, body: JSON.stringify(response, null, 2) });
-      setInstructions(await listPendingTransfers());
+      setInstructions(await refreshInstructions());
     } catch (caught) {
       setResult(errorToResult(caught, titles.failure));
     } finally {

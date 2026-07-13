@@ -11,6 +11,15 @@ import {
 import { run, sleep, tryRun, type RunOptions } from './process.js';
 import { log } from './output.js';
 
+type PqsService = (typeof PQS_SERVICES)[number];
+type PqsDatabase = (typeof PQS_DATABASES)[number];
+
+const PQS_DATABASE_BY_SERVICE: Record<PqsService, PqsDatabase> = {
+  'pqs-bank': 'pqs_bank',
+  'pqs-users': 'pqs_users',
+  'pqs-observer': 'pqs_observer',
+};
+
 export function compose(args: string[]): string {
   return run('docker', ['compose', ...args], { capture: true });
 }
@@ -126,11 +135,13 @@ export function tryRunContracts(args: string[]): { ok: boolean; stdout: string }
   ]);
 }
 
-export function resetPqsDatabases(): void {
-  log('Rebuilding PQS read-model databases...');
-  tryRun('docker', ['compose', 'stop', ...PQS_SERVICES]);
+export function resetPqsDatabases(databases: readonly PqsDatabase[] = PQS_DATABASES): void {
+  const services = pqsServicesForDatabases(databases);
 
-  for (const database of PQS_DATABASES) {
+  log(`Rebuilding PQS read-model database${databases.length === 1 ? '' : 's'}: ${databases.join(', ')}...`);
+  tryRun('docker', ['compose', 'stop', ...services]);
+
+  for (const database of databases) {
     run('docker', [
       'exec',
       'canton-demo-pqs-postgres',
@@ -148,7 +159,7 @@ export function resetPqsDatabases(): void {
     ], { capture: true });
   }
 
-  compose(['up', '-d', ...PQS_SERVICES]);
+  compose(['up', '-d', ...services]);
 }
 
 export function restartPqsServices(): void {
@@ -165,9 +176,10 @@ export async function waitForPqs(): Promise<void> {
 
     if (servicesReady && databasesReady) return;
 
-    if (!resetAttempted && pqsOffsetMismatchDetected()) {
+    const mismatchedServices = pqsOffsetMismatchServices();
+    if (!resetAttempted && mismatchedServices.length > 0) {
       resetAttempted = true;
-      resetPqsDatabases();
+      resetPqsDatabases(mismatchedServices.map((service) => PQS_DATABASE_BY_SERVICE[service]));
       deadline = Date.now() + 180_000;
     }
 
@@ -220,15 +232,13 @@ function serviceStatus(service: string): string {
   return health === 'healthy' || health === 'none' ? 'ready' : health || 'unknown';
 }
 
-function pqsOffsetMismatchDetected(): boolean {
-  for (const service of PQS_SERVICES) {
-    const logs = tryRun('docker', ['logs', '--since', '30s', '--tail', '120', `canton-demo-${service}`]).stdout;
-    if (logs.includes('Cannot prepend to existing datastore')) {
-      return true;
-    }
-  }
+function pqsOffsetMismatchServices(): PqsService[] {
+  return PQS_SERVICES.filter((service) => {
+    if (serviceStatus(service) === 'ready') return false;
 
-  return false;
+    const logs = tryRun('docker', ['logs', '--tail', '500', `canton-demo-${service}`]).stdout;
+    return logs.includes('Cannot prepend to existing datastore');
+  });
 }
 
 function pqsDatabaseReady(database: string): boolean {
@@ -252,4 +262,8 @@ function dockerUserArgs(): string[] {
   return typeof process.getuid === 'function' && typeof process.getgid === 'function'
     ? ['--user', `${process.getuid()}:${process.getgid()}`]
     : [];
+}
+
+function pqsServicesForDatabases(databases: readonly PqsDatabase[]): PqsService[] {
+  return PQS_SERVICES.filter((service) => databases.includes(PQS_DATABASE_BY_SERVICE[service]));
 }
